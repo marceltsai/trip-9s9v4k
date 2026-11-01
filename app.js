@@ -1,4 +1,4 @@
-// Read-only companion view of a trip from the 附近收藏 app.
+// Read-only companion view of a trip from the 旅途口袋 app.
 // Link format: ?trip=<id>&lists=<list>,<list>   (lists optional: all lists when absent)
 (() => {
   const params = new URLSearchParams(location.search);
@@ -196,7 +196,7 @@
     h += '</div>';
 
     if (trip.baggage) h += `<div class="section-title">行李</div><div class="card pad">🧳 ${esc(trip.baggage)}</div>`;
-    h += '<p class="credit">由「附近收藏」App 分享 · 唯讀頁面</p>';
+    h += '<p class="credit">由「旅途口袋」App 分享 · 唯讀頁面</p>';
     $('view-trip').innerHTML = h;
 
     document.querySelectorAll('[data-nearby]').forEach((b) => b.addEventListener('click', () => {
