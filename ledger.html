@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>旅程分帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="ledger.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 id="page-title">分帳</h1>
+  <button id="reload" class="link" type="button">重新整理</button>
+  <span class="readonly">唯讀</span>
+</header>
+
+<main>
+  <p class="status" id="status" role="status">讀取中…</p>
+  <section id="view-entries" class="view" hidden></section>
+  <section id="view-settle" class="view" hidden></section>
+  <section id="view-pays" class="view" hidden></section>
+  <section id="view-fund" class="view" hidden></section>
+  <section id="view-debts" class="view" hidden></section>
+  <section id="view-receipts" class="view" hidden></section>
+</main>
+
+<nav class="tabbar ledger-tabs" id="tabs" hidden>
+  <button data-view="entries" class="on" type="button"><span class="ico">🧾</span>收支</button>
+  <button data-view="settle" type="button"><span class="ico">⚖️</span>結算</button>
+  <button data-view="pays" type="button"><span class="ico">🔁</span>還款</button>
+  <button data-view="fund" type="button"><span class="ico">🐷</span>公基金</button>
+  <button data-view="debts" type="button"><span class="ico">👤</span>欠款</button>
+  <button data-view="receipts" type="button"><span class="ico">📷</span>收據</button>
+</nav>
+
+<div class="sheet-backdrop" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="handle"></div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script src="ledger.js"></script>
+</body>
+</html>
