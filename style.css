@@ -105,6 +105,10 @@ main { max-width: 720px; margin: 0 auto; }
 .datebox small { display: block; color: var(--muted); }
 .datebox b { font-size: 19px; display: block; }
 .line { display: flex; gap: 8px; padding: 3px 0; }
+.costs .line b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.costs .line small { color: var(--muted); }
+.costs .total-line { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+.costs .center-note a { color: var(--primary); }
 .warn { background: var(--warn-bg); color: var(--warn-fg); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
 .warn ul { margin: 4px 0 0; padding-left: 1.2em; }
 

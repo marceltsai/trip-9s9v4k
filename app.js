@@ -243,6 +243,18 @@
         warn: a.notes.length ? `<div class="warn"><b>❗ 入場須知</b><ul>${a.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>` : '' });
     }
 
+    const costs = trip.costs || [];
+    if (costs.length) {
+      const totals = {};
+      costs.forEach((c) => { totals[c.currency] = (totals[c.currency] || 0) + Number(c.amount || 0); });
+      const amt = (n, cur) => `${esc(cur)} ${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+      h += `<div class="section-title">費用</div><div class="card pad costs">
+        ${costs.map((c) => `<div class="line"><span style="flex:1">${esc(c.label)}${c.date ? ` <small>${md(parse(c.date.slice(0, 10)))}</small>` : ''}</span><b>${amt(c.amount, c.currency)}</b></div>`).join('')}
+        <div class="line total-line"><span style="flex:1">合計</span><b>${Object.entries(totals).map(([cur, n]) => amt(n, cur)).join(' + ')}</b></div>
+        ${trip.ledgerId ? `<p class="center-note">每個人付了多少、還欠多少，請看<a href="ledger.html?id=${encodeURIComponent(trip.ledgerId)}">分帳</a></p>` : ''}
+      </div>`;
+    }
+
     h += '<div class="section-title">每日行程</div><div class="card pad timeline">';
     const evs = events();
     let day = null;
