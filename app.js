@@ -116,8 +116,17 @@
     };
     trip = data.trip;
     trip.plans = trip.plans || [];
-    const lists = params.get('lists')?.split(',').map((s) => s.trim()).filter(Boolean);
+    // Old links name the lists; newer trips carry them in their data.
+    const lists = params.get('lists')?.split(',').map((s) => s.trim()).filter(Boolean)
+      || (trip.lists && trip.lists.length ? trip.lists : null);
     saved = data.places.filter((p) => !lists || p.lists.some((l) => lists.includes(l)));
+    if (trip.ledgerId && /^[A-Za-z0-9]{10,64}$/.test(trip.ledgerId)) {
+      const tab = document.createElement('a');
+      tab.href = `ledger.html?id=${encodeURIComponent(trip.ledgerId)}`;
+      tab.innerHTML = '<span class="ico">💰</span>分帳';
+      document.querySelector('.tabbar').append(tab);
+      document.querySelector('.tabbar').classList.add('four');
+    }
     const seen = new Set();
     recs = data.recs.map(toRec).filter(Boolean).filter((r) => {
       const key = `${r.name}@${r.lat.toFixed(3)},${r.lng.toFixed(3)}`;
@@ -187,6 +196,10 @@
     let h = `<div class="hero"><div style="flex:1;min-width:0"><h2>${esc(trip.title)}</h2>
       <div class="dates">${md(start)} – ${md(end)}</div><div class="nights">${days} 天 ${days - 1} 夜</div></div>
       <div class="countdown"><b>${big}</b><span>${small}</span></div></div>`;
+    if (trip.ledgerId && /^[A-Za-z0-9]{10,64}$/.test(trip.ledgerId)) {
+      h += `<a class="card pad ledger-link" href="ledger.html?id=${encodeURIComponent(trip.ledgerId)}">
+        <span class="ico">💰</span><span><b>分帳</b><small>每個人付了多少、還欠多少</small></span><span aria-hidden="true">›</span></a>`;
+    }
 
     if (trip.reminders.length) {
       h += `<div class="card pad reminders"><h3>🔔 注意事項</h3>${trip.reminders.map((r) => {
