@@ -84,12 +84,38 @@
   let view = 'trip', showRecs = false, cats = new Set(), maxDist = 1000;
   let center = null, centerLabel = '', map = null, mapLayer = null;
 
+  // Trips the app keeps up to date live in the cloud; the files under data/
+  // are the versions published from the computer. The cloud copy wins.
+  const API_KEY = 'AIzaSyBKHEGlxuAqRE8zjO3sE9gZOu15lWYKZsk';
+  const DOCS = 'https://firestore.googleapis.com/v1/projects/travel-pocket-61d1b/databases/(default)/documents';
+
+  async function fetchCloud(id) {
+    try {
+      const r = await fetch(`${DOCS}/trips/${encodeURIComponent(id)}?key=${API_KEY}`, { cache: 'no-store' });
+      if (!r.ok) return null;
+      return JSON.parse((await r.json()).fields.json.stringValue);
+    } catch (e) { return null; }
+  }
+  async function fetchStatic(id) {
+    try {
+      const r = await fetch(`data/${encodeURIComponent(id)}.json`);
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+
   async function load() {
     // No index of trips on purpose: each trip is reachable only by its own link.
     const id = params.get('trip');
     if (!id || !/^[\w-]+$/.test(id)) throw new Error('連結缺少行程代號');
-    data =await fetch(`data/${encodeURIComponent(id)}.json`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const [cloud, local] = await Promise.all([fetchCloud(id), fetchStatic(id)]);
+    if (!cloud && !local) throw new Error('找不到這個行程');
+    data = {
+      trip: (cloud || local).trip,
+      places: (cloud && cloud.places && cloud.places.length ? cloud : local || cloud).places || [],
+      recs: (local && local.recs) || [],
+    };
     trip = data.trip;
+    trip.plans = trip.plans || [];
     const lists = params.get('lists')?.split(',').map((s) => s.trim()).filter(Boolean);
     saved = data.places.filter((p) => !lists || p.lists.some((l) => lists.includes(l)));
     const seen = new Set();
@@ -100,7 +126,8 @@
       // Already saved places are not "recommendations".
       return !saved.some((p) => km(p, r) < 0.08 && (p.name.includes(r.name) || r.name.includes(p.name) || (r.altName && p.name.includes(r.altName))));
     });
-    center = trip.center;
+    // A trip made on the phone may have no located stop yet.
+    center = trip.center || (saved[0] && { lat: saved[0].lat, lng: saved[0].lng }) || { lat: 25.0478, lng: 121.517 };
     centerLabel = trip.lodging[0] ? `以 ${trip.lodging[0].name.split('（')[0]} 為中心` : '以行程地點為中心';
     document.title = trip.title;
     renderTrip();
@@ -123,13 +150,35 @@
       out.push({ t: parse(l.checkOut), icon: '🧳', title: '退房', sub: `${hm(parse(l.checkOut))} 前退房`, lat: l.lat, lng: l.lng });
     }
     for (const a of trip.activities) {
-      out.push({ t: parse(a.entryStart), icon: '🎫', title: `${a.category} 換票入場`, sub: `${window_(a)} · ${a.venue}`, lat: a.lat, lng: a.lng });
+      out.push({ t: parse(a.entryStart), icon: '🎫', title: `${a.category} 換票入場`, sub: `${window_(a)} · ${a.venue}`, lat: a.lat, lng: a.lng, stop: true });
     }
-    return out.sort((a, b) => a.t - b.t);
+    for (const p of trip.plans) {
+      out.push({
+        t: parse(`${p.date}T${p.start || '00:00'}`), untimed: !p.start, icon: PLAN_ICON[p.category] || '📌',
+        title: p.title || p.place,
+        sub: [p.end ? `到 ${p.end}` : '', p.place && p.place !== p.title ? p.place : '', p.note || ''].filter(Boolean).join(' · '),
+        lat: p.lat, lng: p.lng, q: p.lat == null ? p.place : null, stop: true,
+      });
+    }
+    out.forEach((e, i) => { e.i = i; });
+    // Same-time items keep their order; untimed plans come first on their day.
+    return out.sort((a, b) => (a.t - b.t) || ((a.untimed ? 0 : 1) - (b.untimed ? 0 : 1)) || (a.i - b.i));
+  }
+  const PLAN_ICON = { sight: '⛩️', food: '🍽️', transport: '🚆', shopping: '🛍️', other: '📌' };
+  const dest = (e) => e.lat != null ? `${e.lat},${e.lng}` : e.q || null;
+  // Google Maps directions through a day's stops from wherever the viewer is.
+  function routeUrl(dayEvents) {
+    const stops = dayEvents.filter((e) => e.stop).map(dest).filter(Boolean).slice(0, 10);
+    if (stops.length < 2) return null;
+    const u = new URL('https://www.google.com/maps/dir/');
+    u.searchParams.set('api', '1');
+    u.searchParams.set('destination', stops[stops.length - 1]);
+    u.searchParams.set('waypoints', stops.slice(0, -1).join('|'));
+    return u.toString();
   }
   const airport = (code) => ({ TPE: 'Taoyuan International Airport Terminal 1', FUK: 'Fukuoka Airport International Terminal', PUS: 'Gimhae International Airport' }[code]);
   const window_ = (a) => a.entryEnd ? `${hm(parse(a.entryStart))}–${hm(parse(a.entryEnd))}` : hm(parse(a.entryStart));
-  const navTo = (e) => e.q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.q)}` : e.lat != null ? navUrl(e.lat, e.lng) : null;
+  const navTo = (e) => e.lat != null ? navUrl(e.lat, e.lng) : e.q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.q)}` : null;
 
   function renderTrip() {
     const start = parse(trip.startDate), end = parse(trip.endDate), today = dayOnly(new Date());
@@ -186,13 +235,18 @@
     let day = null;
     evs.forEach((e, i) => {
       const d = dayOnly(e.t);
-      if (+d !== +day) { day = d; h += `<div class="day"><b>第 ${daysBetween(start, d) + 1} 天</b>${md(d)}</div>`; }
+      if (+d !== +day) {
+        day = d;
+        const route = routeUrl(evs.filter((x) => +dayOnly(x.t) === +d));
+        h += `<div class="day"><b>第 ${daysBetween(start, d) + 1} 天</b>${md(d)}${route ? `<a class="btn day-route" href="${esc(route)}" target="_blank" rel="noopener">🗺️ 當天路線</a>` : ''}</div>`;
+      }
       const last = i === evs.length - 1 || +dayOnly(evs[i + 1].t) !== +d;
       const nav = navTo(e);
-      h += `<div class="ev"><div class="t">${hm(e.t)}</div><div class="rail"><div class="dot">${e.icon}</div>${last ? '' : '<div class="bar"></div>'}</div>
+      h += `<div class="ev"><div class="t">${e.untimed ? '待定' : hm(e.t)}</div><div class="rail"><div class="dot">${e.icon}</div>${last ? '' : '<div class="bar"></div>'}</div>
         <div class="txt"><b>${esc(e.title)}</b><small>${esc(e.sub)}</small></div>
-        ${nav ? `<a class="nav" href="${nav}" target="_blank" rel="noopener" aria-label="導航">🧭</a>` : '<span></span>'}</div>`;
+        ${nav ? `<a class="nav" href="${esc(nav)}" target="_blank" rel="noopener" aria-label="導航">🧭</a>` : '<span></span>'}</div>`;
     });
+    if (!evs.length) h += '<p class="empty">還沒有行程</p>';
     h += '</div>';
 
     if (trip.baggage) h += `<div class="section-title">行李</div><div class="card pad">🧳 ${esc(trip.baggage)}</div>`;

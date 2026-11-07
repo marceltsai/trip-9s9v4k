@@ -110,6 +110,7 @@ main { max-width: 720px; margin: 0 auto; }
 
 .timeline .day { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
 .timeline .day:first-child { margin-top: 0; }
+.timeline .day-route { margin-left: auto; padding: 3px 12px; font-size: 13px; }
 .timeline .day b { background: var(--primary); color: var(--on-primary); border-radius: 12px; padding: 2px 10px; font-size: 14px; }
 .ev { display: grid; grid-template-columns: 46px 28px 1fr auto; gap: 6px; }
 .ev .t { font-weight: 700; font-size: 14px; padding-top: 6px; font-variant-numeric: tabular-nums; }
