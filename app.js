@@ -155,11 +155,11 @@
       });
     }
     for (const l of trip.lodging) {
-      out.push({ t: parse(l.checkIn), icon: '🛏️', title: `入住 ${l.name}`, sub: `${hm(parse(l.checkIn))} 後可入住 · ${l.nights} 晚`, lat: l.lat, lng: l.lng });
-      out.push({ t: parse(l.checkOut), icon: '🧳', title: '退房', sub: `${hm(parse(l.checkOut))} 前退房`, lat: l.lat, lng: l.lng });
+      out.push({ t: parse(l.checkIn), icon: '🛏️', title: `入住 ${l.name}`, sub: `${hm(parse(l.checkIn))} 後可入住 · ${l.nights} 晚`, lat: l.lat, lng: l.lng, q: l.lat == null ? (l.address || l.name) : null, stop: true });
+      out.push({ t: parse(l.checkOut), icon: '🧳', title: '退房', sub: `${hm(parse(l.checkOut))} 前退房`, lat: l.lat, lng: l.lng, q: l.lat == null ? (l.address || l.name) : null });
     }
     for (const a of trip.activities) {
-      out.push({ t: parse(a.entryStart), icon: '🎫', title: `${a.category} 換票入場`, sub: `${window_(a)} · ${a.venue}`, lat: a.lat, lng: a.lng, stop: true });
+      out.push({ t: parse(a.entryStart), icon: '🎫', title: `${a.category} 換票入場`, sub: `${window_(a)} · ${a.venue}`, lat: a.lat, lng: a.lng, q: a.lat == null ? (a.address || a.venue || a.name) : null, stop: true });
     }
     for (const p of trip.plans) {
       out.push({
@@ -172,6 +172,17 @@
     out.forEach((e, i) => { e.i = i; });
     // Same-time items keep their order; untimed plans come first on their day.
     return out.sort((a, b) => (a.t - b.t) || ((a.untimed ? 0 : 1) - (b.untimed ? 0 : 1)) || (a.i - b.i));
+  }
+  // The dashed path with a small plane flying along it, from the first airport
+  // code to the second. With reduced motion on, the plane just rests near the end.
+  const ARC = 'M4 30 Q50 -14 82 22';
+  const PLANE = 'M-8 -1 L6 -1 Q10 0 6 1 L-8 1 Z M-1 -1 L-5 -7 L-3 -7 L3 -1 Z M-1 1 L-5 7 L-3 7 L3 1 Z M-8 -1 L-10 -4 L-8 -4 L-5 -1 Z M-8 1 L-10 4 L-8 4 L-5 1 Z';
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function flightArc() {
+    const plane = still
+      ? `<path d="${PLANE}" transform="translate(78 20) rotate(55)" fill="currentColor"/>`
+      : `<g fill="currentColor"><path d="${PLANE}"/><animateMotion dur="4.2s" repeatCount="indefinite" path="${ARC}" rotate="auto" calcMode="spline" keyTimes="0;.85;1" keyPoints="0;1;1" keySplines=".42 0 .58 1;0 0 1 1"/><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.85;.98;1" dur="4.2s" repeatCount="indefinite"/></g>`;
+    return `<svg viewBox="0 0 100 34" aria-hidden="true"><path d="${ARC}" fill="none" stroke="currentColor" stroke-opacity=".4" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6"/>${plane}</svg>`;
   }
   const PLAN_ICON = { sight: '⛩️', food: '🍽️', transport: '🚆', shopping: '🛍️', other: '📌' };
   const dest = (e) => e.lat != null ? `${e.lat},${e.lng}` : e.q || null;
@@ -219,7 +230,7 @@
         const dur = `${Math.floor(mins / 60)} 小時${mins % 60 ? ` ${mins % 60} 分` : ''}`;
         const plus = daysBetween(dep, arr);
         h += `<div class="seg"><div><div class="code">${esc(fc)}</div><div class="time">${hm(dep)}</div><div class="name">${esc(s.from.slice(fc.length).trim())}</div></div>
-          <div class="arc"><svg viewBox="0 0 100 34" aria-hidden="true"><path d="M4 30 Q50 -14 82 22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6"/><text x="84" y="28" font-size="16" fill="currentColor">✈</text></svg>${dur}</div>
+          <div class="arc">${flightArc()}${dur}</div>
           <div class="end"><div class="code">${esc(tc)}</div><div class="time">${hm(arr)}${plus > 0 ? ` +${plus}` : ''}</div><div class="name">${esc(s.to.slice(tc.length).trim())}</div></div></div>
           <div class="tags"><span class="tag">✈ ${esc(s.flight)}</span><span class="tag">${esc(s.airline)}</span>
           ${airport(fc) ? `<a class="btn" style="margin-left:auto;padding:4px 12px" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(airport(fc))}" target="_blank" rel="noopener">導航到機場</a>` : ''}</div>`;
@@ -230,14 +241,14 @@
 
     if (trip.lodging.length) h += '<div class="section-title">住宿</div>';
     for (const l of trip.lodging) {
-      h += placeCard({ image: l.image, title: l.name, badge: `${l.nights} 晚`, lat: l.lat, lng: l.lng, mapsUrl: l.mapsUrl,
+      h += placeCard({ image: l.image, title: l.name, badge: `${l.nights} 晚`, lat: l.lat, lng: l.lng, mapsUrl: l.mapsUrl, q: l.address || l.name,
         boxes: `<div class="datebox"><small>入住</small><b>${md(parse(l.checkIn))}</b>${hm(parse(l.checkIn))} 後</div><span>→</span><div class="datebox"><small>退房</small><b>${md(parse(l.checkOut))}</b>${hm(parse(l.checkOut))} 前</div>`,
-        lines: [['📍', l.address], ['🛏️', l.room]] });
+        lines: [['📍', l.address], ['🛏️', l.room], ['📅', l.cancellation]] });
     }
 
     if (trip.activities.length) h += '<div class="section-title">活動與票券</div>';
     for (const a of trip.activities) {
-      h += placeCard({ image: a.image, title: a.name, badge: a.category, lat: a.lat, lng: a.lng, mapsUrl: a.mapsUrl,
+      h += placeCard({ image: a.image, title: a.name, badge: a.category, lat: a.lat, lng: a.lng, mapsUrl: a.mapsUrl, q: a.address || a.venue || a.name,
         boxes: `<div class="datebox"><small>換票入場</small><b>${md(parse(a.entryStart))}</b>${window_(a)}</div><div class="datebox"><small>票種</small><b>${esc(a.ticket)}</b>&nbsp;</div>`,
         lines: [['🏟️', a.venue], ['📍', a.address]],
         warn: a.notes.length ? `<div class="warn"><b>❗ 入場須知</b><ul>${a.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>` : '' });
@@ -289,13 +300,15 @@
   function placeCard(o) {
     const lines = o.lines.filter(([, v]) => v).map(([i, v]) => `<div class="line"><span>${i}</span><span>${esc(v)}</span></div>`).join('');
     const short = esc(o.title.split('（')[0].split('「')[0]);
+    // Stays added by hand may have no coordinates yet: navigate by name or address.
+    const located = o.lat != null && o.lng != null;
     return `<div class="card">
       <div class="photo">${o.image ? `<img src="images/${esc(o.image.split('/').pop())}" alt="">` : ''}<h3>${esc(o.title)}</h3>${o.badge ? `<span class="badge">${esc(o.badge)}</span>` : ''}</div>
       <div class="pad"><div class="dates2">${o.boxes}</div><div style="margin-top:10px">${lines}</div>${o.warn || ''}
-      <div class="actions"><a class="btn fill" href="${navUrl(o.lat, o.lng)}" target="_blank" rel="noopener">🧭 導航</a>
-        <button class="btn" type="button" data-nearby="${o.lat},${o.lng},0" data-label="${short}">📌 附近收藏</button>
-        <button class="btn" type="button" data-nearby="${o.lat},${o.lng},1" data-label="${short}">✨ 附近推薦</button>
-        ${o.mapsUrl ? `<a class="btn" href="${esc(o.mapsUrl)}" target="_blank" rel="noopener">🗺️ 地圖</a>` : ''}</div></div></div>`;
+      <div class="actions"><a class="btn fill" href="${esc(located ? navUrl(o.lat, o.lng) : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.q || o.title)}`)}" target="_blank" rel="noopener">🧭 導航</a>
+        ${located ? `<button class="btn" type="button" data-nearby="${o.lat},${o.lng},0" data-label="${short}">📌 附近收藏</button>
+        <button class="btn" type="button" data-nearby="${o.lat},${o.lng},1" data-label="${short}">✨ 附近推薦</button>` : ''}
+        <a class="btn" href="${esc(o.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.q || o.title)}`)}" target="_blank" rel="noopener">🗺️ 地圖</a></div></div></div>`;
   }
 
   // --- 清單 ---
@@ -331,7 +344,7 @@
         const sub = p.rec ? [fmtDist(m), p.kind, p.hours].filter(Boolean).join(' · ') : `${fmtDist(m)} · ${p.lists.join('、')}`;
         return `<li data-i="${i}"><div class="ic${p.rec ? ' rec' : ''}" style="${p.rec ? '' : `background:${c.color}`}">${c.icon}</div>
           <div class="main"><b>${esc(p.name)}</b><small>${esc(sub)}</small></div>
-          <a class="nav" href="${navUrl(p.lat, p.lng)}" target="_blank" rel="noopener" aria-label="導航">🧭</a></li>`;
+          <span class="acts"><a class="nav" href="${esc(mapUrl(p))}" target="_blank" rel="noopener" aria-label="Google 地圖">🗺️</a><a class="nav" href="${navUrl(p.lat, p.lng)}" target="_blank" rel="noopener" aria-label="導航">🧭</a></span></li>`;
       }).join('');
       ul.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', (ev) => {
         if (ev.target.closest('a')) return;
@@ -344,6 +357,8 @@
       : '';
   }
 
+  const mapUrl = (p) => p.mapsUrl || searchUrl(p.altName || p.name, p.lat, p.lng);
+
   function openSheet(p, m) {
     const c = CATS[p.category] || CATS.other;
     $('sheet-body').innerHTML = `<h3>${c.icon} ${esc(p.name)}</h3>
@@ -353,8 +368,7 @@
       ${p.hours ? `<p>🕒 ${esc(p.hours)}</p>` : ''}
       ${p.lists ? `<div class="lists">${p.lists.map((l) => `<span class="tag">${esc(l)}</span>`).join('')}</div>` : '<p class="sub">附近推薦（OpenStreetMap），不是收藏</p>'}
       <div class="actions"><a class="btn fill" href="${navUrl(p.lat, p.lng)}" target="_blank" rel="noopener">🧭 導航</a>
-      ${p.rec ? `<a class="btn" href="${searchUrl(p.altName || p.name, p.lat, p.lng)}" target="_blank" rel="noopener">⭐ 看評價</a>`
-              : `<a class="btn" href="${esc(p.mapsUrl || searchUrl(p.name, p.lat, p.lng))}" target="_blank" rel="noopener">🗺️ Google 地圖</a>`}</div>`;
+      <a class="btn" href="${esc(mapUrl(p))}" target="_blank" rel="noopener">🗺️ Google 地圖</a></div>`;
     $('sheet').hidden = false;
   }
   $('sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') $('sheet').hidden = true; });
