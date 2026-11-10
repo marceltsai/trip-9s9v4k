@@ -94,6 +94,7 @@ main { max-width: 720px; margin: 0 auto; }
 .seg .end { text-align: right; }
 .arc { text-align: center; font-size: 12px; padding-top: 6px; }
 .arc svg { width: 100%; height: 34px; color: var(--primary); }
+.arc.flip svg { transform: scaleX(-1); }
 .tags { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .tag { background: var(--surface-2); border-radius: 8px; padding: 2px 8px; font-size: 12px; }
 .layover { margin-top: 12px; background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border-radius: 12px; padding: 8px 12px; font-size: 14px; }

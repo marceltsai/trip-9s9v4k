@@ -239,16 +239,23 @@
     if (trip.flights.length) h += '<div class="section-title">航班</div>';
     for (const leg of trip.flights) {
       const f = leg.segments[0], l = leg.segments[leg.segments.length - 1];
-      h += `<div class="card pad"><div class="leg-head">${leg.direction === '回程' ? '🛬' : '🛫'} ${esc(leg.direction)}　${esc(f.from.split(' ')[1] || '')} → ${esc(l.to.split(' ')[1] || '')}<span class="date">${md(parse(f.depart))}</span></div>`;
+      // A return trip reads right to left, like the plane flies.
+      const back = leg.direction === '回程';
+      const fromName = esc(f.from.split(' ')[1] || ''), toName = esc(l.to.split(' ')[1] || '');
+      h += `<div class="card pad"><div class="leg-head">${back ? '🛬' : '🛫'} ${esc(leg.direction)}　${back ? `${toName} ← ${fromName}` : `${fromName} → ${toName}`}<span class="date">${md(parse(f.depart))}</span></div>`;
       leg.segments.forEach((s, i) => {
         const fc = s.from.split(' ')[0], tc = s.to.split(' ')[0];
         const dep = parse(s.depart), arr = parse(s.arrive);
         const mins = Math.round((arr - dep) / 60000) - (utcOffset(tc) - utcOffset(fc)) * 60;
         const dur = `${Math.floor(mins / 60)} 小時${mins % 60 ? ` ${mins % 60} 分` : ''}`;
         const plus = daysBetween(dep, arr);
-        h += `<div class="seg"><div><div class="code">${esc(fc)}</div><div class="time">${hm(dep)}</div><div class="name">${esc(s.from.slice(fc.length).trim())}</div></div>
-          <div class="arc">${flightArc()}${dur}</div>
-          <div class="end"><div class="code">${esc(tc)}</div><div class="time">${hm(arr)}${plus > 0 ? ` +${plus}` : ''}</div><div class="name">${esc(s.to.slice(tc.length).trim())}</div></div></div>
+        // Where it takes off and where it lands; a return flight swaps the sides
+        // and the plane flies right to left.
+        const fromBlock = (end) => `<div${end ? ' class="end"' : ''}><div class="code">${esc(fc)}</div><div class="time">${hm(dep)}</div><div class="name">${esc(s.from.slice(fc.length).trim())}</div></div>`;
+        const toBlock = (end) => `<div${end ? ' class="end"' : ''}><div class="code">${esc(tc)}</div><div class="time">${hm(arr)}${plus > 0 ? ` +${plus}` : ''}</div><div class="name">${esc(s.to.slice(tc.length).trim())}</div></div>`;
+        h += `<div class="seg">${back ? toBlock(false) : fromBlock(false)}
+          <div class="arc${back ? ' flip' : ''}">${flightArc()}${dur}</div>
+          ${back ? fromBlock(true) : toBlock(true)}</div>
           <div class="tags"><span class="tag">✈ ${esc(s.flight)}</span><span class="tag">${esc(s.airline)}</span>
           ${airport(fc) ? `<a class="btn" style="margin-left:auto;padding:4px 12px" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(airport(fc))}" target="_blank" rel="noopener">導航到機場</a>` : ''}</div>`;
         if (i < leg.segments.length - 1 && leg.layover) h += `<div class="layover">⏱️ 轉機　${esc(leg.layover)}</div>`;
