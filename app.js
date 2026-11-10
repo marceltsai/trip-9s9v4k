@@ -179,13 +179,29 @@
   // app's cartoon_plane.dart) flying along it from the first airport code to
   // the second, leaving little puffs. With reduced motion on, it rests near the end.
   const ARC = 'M4 30 Q50 -14 82 22';
-  const PLANE_SHAPES = `<g stroke="#fff" stroke-width="2" stroke-linejoin="round" paint-order="stroke" style="fill:var(--secondary)">
-      <path d="M-10.5 -4.6 L-14.8 -9.6 Q-16.4 -11 -17.8 -9.6 L-14.2 -4.6 Z"/><path d="M-10.5 4.6 L-14.8 9.6 Q-16.4 11 -17.8 9.6 L-14.2 4.6 Z"/>
-      <path d="M6 -4.6 L-5 -16 Q-7 -17.6 -9.2 -16 L-6.5 -4.6 Z"/><path d="M6 4.6 L-5 16 Q-7 17.6 -9.2 16 L-6.5 4.6 Z"/>
-      <rect x="-15" y="-5.2" width="31" height="10.4" rx="5.2" style="fill:var(--primary)"/></g>
-    <rect x="9.5" y="-3" width="3.9" height="6" rx="1.9" fill="#fff" opacity=".95"/>
-    <circle cx="5" cy="0" r="1.3" fill="#fff"/><circle cx="1" cy="0" r="1.3" fill="#fff"/><circle cx="-3" cy="0" r="1.3" fill="#fff"/><circle cx="-7" cy="0" r="1.3" fill="#fff"/>
-    <rect x="-11" y="-4.2" width="16" height="1.3" rx=".65" fill="#fff" opacity=".3"/>`;
+  const PL = {
+    body: 'M19 1 C19 -8 10 -10.5 2 -10 C-8 -9.5 -16 -7 -22 -3.5 Q-24.5 -1.5 -22 0.8 C-16 4.5 -8 8.5 2 8.8 C10 9.2 19 8 19 1 Z',
+    farWing: 'M3 -6 L-5 -16 Q-7.5 -18.5 -10 -16.2 L-7 -6 Z',
+    nearWing: 'M6 2 L-3 14.5 Q-5.5 17.5 -9 15.6 L-6.5 3 Z',
+    fin: 'M-12 -6.5 L-18.5 -17 Q-20.5 -19.5 -22.5 -17 L-21.5 -3.5 Z',
+    farTail: 'M-15 -3 L-21 -8 Q-23 -9.5 -24 -7 L-20.5 -1.5 Z',
+    nearTail: 'M-15 1.5 L-21.5 6 Q-23.5 7.5 -24.5 5 L-21 0.2 Z',
+  };
+  const TIP = '#FFC83D';
+  const EDGE = 'stroke="rgba(0,0,0,.28)" stroke-width=".8" stroke-linejoin="round"';
+  const part = (d, extra = '') => `<path d="${d}" style="fill:var(--primary)"/><path d="${d}" fill="url(#plShade)"/>${extra}<path d="${d}" fill="none" ${EDGE}/>`;
+  const PLANE_SHAPES = `<defs><linearGradient id="plShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
+    <clipPath id="plBody"><path d="${PL.body}"/></clipPath><clipPath id="plFar"><path d="${PL.farWing}"/></clipPath><clipPath id="plNear"><path d="${PL.nearWing}"/></clipPath></defs>
+    <g fill="none" stroke="#fff" stroke-width="4.8" stroke-linejoin="round">${Object.values(PL).map((d) => `<path d="${d}"/>`).join('')}<rect x="-3" y="7" width="8.5" height="5" rx="2.5"/></g>
+    ${part(PL.farWing, `<rect x="-11" y="-19.5" width="15" height="4.2" fill="${TIP}" clip-path="url(#plFar)"/><path d="${PL.farWing}" fill="#000" opacity=".12"/>`)}
+    ${part(PL.farTail, `<path d="${PL.farTail}" fill="#000" opacity=".12"/>`)}
+    ${part(PL.fin)}
+    ${part(PL.body, `<g clip-path="url(#plBody)"><ellipse cx="19.75" cy="0" rx="12.25" ry="14" fill="#F3F6FA" stroke="rgba(0,0,0,.15)"/><rect x="-12" y="-8.6" width="16" height="2" rx="1" fill="#fff" opacity=".45"/></g>`)}
+    <rect x="10.5" y="-7" width="6.3" height="5.2" rx="2.6" fill="#fff" opacity=".92" ${EDGE}/>
+    ${[4, -0.8, -5.6, -10.4].map((x) => `<rect x="${x - 1.6}" y="-6.2" width="3.2" height="4.6" rx="1.6" fill="#fff" opacity=".85" stroke="${TIP}" stroke-width=".7"/>`).join('')}
+    ${part(PL.nearTail)}
+    ${part(PL.nearWing, `<rect x="-11" y="13.2" width="18" height="5" fill="${TIP}" clip-path="url(#plNear)"/>`)}
+    <rect x="-3" y="7" width="8.5" height="5" rx="2.5" fill="#EEF2F6" ${EDGE}/><ellipse cx="5" cy="9.5" rx="1.4" ry="1.9" style="fill:var(--primary)"/><ellipse cx="5.1" cy="9.5" rx=".7" ry=".9" fill="#fff"/>`;
   const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DUR = '4.2s';
   const MOTION = (begin) => `<animateMotion dur="${DUR}" begin="${begin}s" repeatCount="indefinite" path="${ARC}" rotate="auto" calcMode="spline" keyTimes="0;.85;1" keyPoints="0;1;1" keySplines=".42 0 .58 1;0 0 1 1"/>`;
