@@ -175,30 +175,27 @@
     // Same-time items keep their order; untimed plans come first on their day.
     return out.sort((a, b) => (a.t - b.t) || ((a.untimed ? 0 : 1) - (b.untimed ? 0 : 1)) || (a.i - b.i));
   }
-  // The dashed path with a small round cartoon plane (it has a face) bobbing
-  // along it from the first airport code to the second, leaving little puffs.
-  // With reduced motion on, the plane just rests near the end.
+  // The dashed path with a small chubby cartoon airliner (same shapes as the
+  // app's cartoon_plane.dart) flying along it from the first airport code to
+  // the second, leaving little puffs. With reduced motion on, it rests near the end.
   const ARC = 'M4 30 Q50 -14 82 22';
-  const PLANE_SHAPES = `<path d="M-1 -5 L-5 -10.5 Q-2 -11.5 3 -5 Z" style="fill:var(--tertiary)" opacity=".65"/>
-    <path d="M-10 -4 L-15 -11.5 Q-11.5 -12.5 -6.5 -4 Z" style="fill:var(--tertiary)"/>
-    <rect x="-14" y="-6.5" width="28" height="13" rx="6.5" style="fill:var(--primary)"/>
-    <path d="M-4 4 L-9 12 Q-5.5 13.5 2.5 5.5 Z" style="fill:var(--tertiary)"/>
-    <ellipse cx="15.2" cy="0" rx="1.2" ry="5" style="fill:var(--tertiary)" opacity=".85"/>
-    <circle cx="3.6" cy="-1.6" r="2.7" fill="#fff"/><circle cx="9.4" cy="-1.6" r="2.7" fill="#fff"/>
-    <circle cx="4.3" cy="-1.3" r="1.3" fill="#2b2b2b"/><circle cx="10.1" cy="-1.3" r="1.3" fill="#2b2b2b"/>
-    <circle cx="4.8" cy="-1.8" r=".45" fill="#fff"/><circle cx="10.6" cy="-1.8" r=".45" fill="#fff"/>
-    <circle cx="1.2" cy="2.2" r="1.5" fill="#ff8fa3" opacity=".85"/><circle cx="12.2" cy="2.2" r="1.5" fill="#ff8fa3" opacity=".85"/>
-    <path d="M5.2 2.6 Q6.5 4.4 7.8 2.6" fill="none" stroke="#2b2b2b" stroke-width="1.2" stroke-linecap="round"/>`;
+  const PLANE_SHAPES = `<g stroke="#fff" stroke-width="2" stroke-linejoin="round" paint-order="stroke" style="fill:var(--secondary)">
+      <path d="M-10.5 -4.6 L-14.8 -9.6 Q-16.4 -11 -17.8 -9.6 L-14.2 -4.6 Z"/><path d="M-10.5 4.6 L-14.8 9.6 Q-16.4 11 -17.8 9.6 L-14.2 4.6 Z"/>
+      <path d="M6 -4.6 L-5 -16 Q-7 -17.6 -9.2 -16 L-6.5 -4.6 Z"/><path d="M6 4.6 L-5 16 Q-7 17.6 -9.2 16 L-6.5 4.6 Z"/>
+      <rect x="-15" y="-5.2" width="31" height="10.4" rx="5.2" style="fill:var(--primary)"/></g>
+    <rect x="9.5" y="-3" width="3.9" height="6" rx="1.9" fill="#fff" opacity=".95"/>
+    <circle cx="5" cy="0" r="1.3" fill="#fff"/><circle cx="1" cy="0" r="1.3" fill="#fff"/><circle cx="-3" cy="0" r="1.3" fill="#fff"/><circle cx="-7" cy="0" r="1.3" fill="#fff"/>
+    <rect x="-11" y="-4.2" width="16" height="1.3" rx=".65" fill="#fff" opacity=".3"/>`;
   const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DUR = '4.2s';
   const MOTION = (begin) => `<animateMotion dur="${DUR}" begin="${begin}s" repeatCount="indefinite" path="${ARC}" rotate="auto" calcMode="spline" keyTimes="0;.85;1" keyPoints="0;1;1" keySplines=".42 0 .58 1;0 0 1 1"/>`;
   function flightArc() {
     let plane;
     if (still) {
-      plane = `<g transform="translate(76 21) rotate(40) scale(.82)">${PLANE_SHAPES}</g>`;
+      plane = `<g transform="translate(76 21) rotate(40) scale(.9)">${PLANE_SHAPES}</g>`;
     } else {
-      const puffs = [1, 2, 3, 4].map((k) => `<circle r="${(3.6 - k * 0.6).toFixed(1)}" style="fill:var(--tertiary)" opacity="0">${MOTION((k * 0.13).toFixed(2))}<animate attributeName="opacity" begin="${(k * 0.13).toFixed(2)}s" values="0;${(0.5 - k * 0.1).toFixed(1)};${(0.5 - k * 0.1).toFixed(1)};0;0" keyTimes="0;.02;.85;.98;1" dur="${DUR}" repeatCount="indefinite"/></circle>`).join('');
-      plane = `${puffs}<g>${MOTION(0)}<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.85;.98;1" dur="${DUR}" repeatCount="indefinite"/><g><animateTransform attributeName="transform" type="rotate" values="-4;4;-4" dur=".84s" repeatCount="indefinite"/><g transform="scale(.82)">${PLANE_SHAPES}</g></g></g>`;
+      const puffs = [1, 2, 3, 4].map((k) => `<circle r="${(3.6 - k * 0.6).toFixed(1)}" style="fill:var(--secondary)" opacity="0">${MOTION((k * 0.13).toFixed(2))}<animate attributeName="opacity" begin="${(k * 0.13).toFixed(2)}s" values="0;${(0.5 - k * 0.1).toFixed(1)};${(0.5 - k * 0.1).toFixed(1)};0;0" keyTimes="0;.02;.85;.98;1" dur="${DUR}" repeatCount="indefinite"/></circle>`).join('');
+      plane = `${puffs}<g>${MOTION(0)}<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.85;.98;1" dur="${DUR}" repeatCount="indefinite"/><g><animateTransform attributeName="transform" type="rotate" values="-4;4;-4" dur=".84s" repeatCount="indefinite"/><g transform="scale(.9)">${PLANE_SHAPES}</g></g></g>`;
     }
     return `<svg viewBox="0 0 100 34" aria-hidden="true"><path d="${ARC}" fill="none" stroke="currentColor" stroke-opacity=".4" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 6"/>${plane}</svg>`;
   }  const PLAN_ICON = { sight: '⛩️', food: '🍽️', transport: '🚆', shopping: '🛍️', other: '📌' };

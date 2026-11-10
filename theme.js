@@ -3,9 +3,10 @@
 // default look. Only #rrggbb values are accepted.
 (() => {
   const NAMES = {
-    bg: '--bg', surface: '--surface', surface2: '--surface-2', fg: '--fg', muted: '--muted',
-    line: '--line', primary: '--primary', onPrimary: '--on-primary', tertiary: '--tertiary',
-    reminder: '--reminder', onReminder: '--on-reminder', warnBg: '--warn-bg', warnFg: '--warn-fg',
+    bg: '--bg', surface: '--surface', surface2: '--surface-2', fg: '--fg', muted: '--muted', line: '--line',
+    primary: '--primary', onPrimary: '--on-primary', secondary: '--secondary', tertiary: '--tertiary',
+    candy: '--candy', onCandy: '--on-candy', candy2: '--candy2', onCandy2: '--on-candy2',
+    candy3: '--candy3', onCandy3: '--on-candy3', warnBg: '--warn-bg', warnFg: '--warn-fg',
   };
   const css = (tokens) => Object.entries(NAMES)
     .filter(([k]) => /^#[0-9a-fA-F]{6}$/.test((tokens || {})[k] || ''))
