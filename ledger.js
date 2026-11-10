@@ -43,6 +43,7 @@
       if (!res.ok) throw new Error(String(res.status));
       const doc = await res.json();
       data = JSON.parse(doc.fields.json.stringValue);
+      if (data.theme && window.applyShareTheme) window.applyShareTheme(data.theme);
       $('status').textContent = '';
       $('tabs').hidden = false;
       document.title = `${data.title} 分帳`;
