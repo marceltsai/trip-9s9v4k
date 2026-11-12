@@ -1,4 +1,4 @@
-// Read-only companion view of a trip from the 旅途口袋 app.
+﻿// Read-only companion view of a trip from the 旅途口袋 app.
 // Link format: ?trip=<id>&lists=<list>,<list>   (lists optional: all lists when absent)
 (() => {
   const params = new URLSearchParams(location.search);
@@ -83,6 +83,13 @@
   let data, trip, saved = [], recs = [];
   let view = 'trip', showRecs = false, cats = new Set(), maxDist = 1000;
   let center = null, centerLabel = '', map = null, mapLayer = null;
+  // Where the trip is (usually its hotel), and whether the viewer's own
+  // position has been asked for yet.
+  let tripCenter = null, tripCenterLabel = '', askedGps = false;
+  // Recommendations: the ones bundled for the trip's area plus those fetched
+  // live around wherever the list is centered.
+  let bundledRecs = [], recsNote = '', recsSeq = 0;
+  const recsDone = [];
 
   // Trips the app keeps up to date live in the cloud; the files under data/
   // are the versions published from the computer. The cloud copy wins.
@@ -129,21 +136,77 @@
       document.querySelector('.tabbar').append(tab);
       document.querySelector('.tabbar').classList.add('four');
     }
+    bundledRecs = data.recs;
+    recs = cleanRecs(bundledRecs);
+    // A trip made on the phone may have no located stop yet.
+    tripCenter = trip.center || (saved[0] && { lat: saved[0].lat, lng: saved[0].lng }) || { lat: 25.0478, lng: 121.517 };
+    tripCenterLabel = trip.lodging[0] ? `以 ${trip.lodging[0].name.split('（')[0]} 為中心` : '以行程地點為中心';
+    center = tripCenter;
+    centerLabel = tripCenterLabel;
+    $('use-trip').textContent = trip.lodging[0] ? '🏨 以住宿為中心' : '🧳 以行程地點為中心';
+    document.title = trip.title;
+    renderTrip();
+    renderChips();
+    renderList();
+    loadPhotos(id);
+  }
+
+  // Overpass elements → recommendations, without duplicates or saved places.
+  function cleanRecs(elements) {
     const seen = new Set();
-    recs = data.recs.map(toRec).filter(Boolean).filter((r) => {
+    return elements.map(toRec).filter(Boolean).filter((r) => {
       const key = `${r.name}@${r.lat.toFixed(3)},${r.lng.toFixed(3)}`;
       if (seen.has(key)) return false;
       seen.add(key);
       // Already saved places are not "recommendations".
       return !saved.some((p) => km(p, r) < 0.08 && (p.name.includes(r.name) || r.name.includes(p.name) || (r.altName && p.name.includes(r.altName))));
     });
-    // A trip made on the phone may have no located stop yet.
-    center = trip.center || (saved[0] && { lat: saved[0].lat, lng: saved[0].lng }) || { lat: 25.0478, lng: 121.517 };
-    centerLabel = trip.lodging[0] ? `以 ${trip.lodging[0].name.split('（')[0]} 為中心` : '以行程地點為中心';
-    document.title = trip.title;
-    renderTrip();
-    renderChips();
+  }
+
+  // Looks up what is around the current center in OpenStreetMap, like the
+  // app does, so recommendations work wherever the viewer is.
+  const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+  async function loadRecsAround(c, radius) {
+    const r = Math.min(Math.max(radius || 3000, 500), 3000);
+    // Already looked up a circle that covers this one.
+    if (recsDone.some((d) => km(d.c, c) * 1000 + r <= d.r + 50)) return;
+    const seq = ++recsSeq;
+    recsNote = '正在找附近的推薦…';
     renderList();
+    const around = `around:${r},${c.lat},${c.lng}`;
+    const q = `[out:json][timeout:40];(nw(${around})["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream|food_court|place_of_worship)$"]["name"];nw(${around})["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|aquarium|theme_park|hotel|hostel|guest_house|motel)$"]["name"];nw(${around})["shop"~"^(mall|department_store|bakery|confectionery|pastry|gift|books)$"]["name"];nw(${around})["historic"]["name"];nw(${around})["leisure"~"^(park|garden)$"]["name"];);out center tags qt;`;
+    let elements = null;
+    for (const url of OVERPASS) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 50000);
+        const res = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctl.signal });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        elements = (await res.json()).elements;
+        break;
+      } catch (e) { /* try the next server */ }
+    }
+    if (elements) {
+      recsDone.push({ c, r });
+      bundledRecs = bundledRecs.concat(elements);
+      recs = cleanRecs(bundledRecs);
+    }
+    if (seq === recsSeq) recsNote = elements ? '' : '推薦資料暫時抓不到，稍後再試';
+    renderList();
+    if (map && view === 'map') renderMap();
+  }
+
+  // Pictures added in the app are small separate cloud entries.
+  function loadPhotos(id) {
+    document.querySelectorAll('img[data-photo]').forEach(async (el) => {
+      try {
+        const r = await fetch(`${DOCS}/trips/${encodeURIComponent(id)}_ph_${el.dataset.photo}?key=${API_KEY}`);
+        if (!r.ok) return;
+        const b64 = (await r.json()).fields.jpeg.stringValue;
+        if (/^[A-Za-z0-9+/=]+$/.test(b64)) el.src = `data:image/jpeg;base64,${b64}`;
+      } catch (e) { /* the card just stays without a picture */ }
+    });
   }
 
   // --- 行程 ---
@@ -243,7 +306,7 @@
     }
 
     if (trip.reminders.length) {
-      h += `<div class="card pad reminders"><h3>🔔 注意事項</h3>${trip.reminders.map((r) => {
+      h += `<div class="card pad reminders"><h3>🔔 注意事項</h3>${trip.reminders.map((r, i) => [r, i]).sort((a, b) => (parse(a[0].date) - parse(b[0].date)) || (a[1] - b[1])).map(([r]) => {
         const d = parse(r.date);
         return `<div class="reminder${d < today ? ' past' : ''}"><b>${md(d)}</b><span>${esc(r.text)}</span></div>`;
       }).join('')}</div>`;
@@ -278,14 +341,14 @@
 
     if (trip.lodging.length) h += '<div class="section-title">住宿</div>';
     for (const l of trip.lodging) {
-      h += placeCard({ image: l.image, title: l.name, badge: `${l.nights} 晚`, lat: l.lat, lng: l.lng, mapsUrl: l.mapsUrl, q: l.address || l.name,
+      h += placeCard({ image: l.image, photo: l.photo, title: l.name, badge: `${l.nights} 晚`, lat: l.lat, lng: l.lng, mapsUrl: l.mapsUrl, q: l.address || l.name,
         boxes: `<div class="datebox"><small>入住</small><b>${md(parse(l.checkIn))}</b>${hm(parse(l.checkIn))} 後</div><span>→</span><div class="datebox"><small>退房</small><b>${md(parse(l.checkOut))}</b>${hm(parse(l.checkOut))} 前</div>`,
         lines: [['📍', l.address], ['🛏️', l.room], ['📅', l.cancellation]] });
     }
 
     if (trip.activities.length) h += '<div class="section-title">活動與票券</div>';
     for (const a of trip.activities) {
-      h += placeCard({ image: a.image, title: a.name, badge: a.category, lat: a.lat, lng: a.lng, mapsUrl: a.mapsUrl, q: a.address || a.venue || a.name,
+      h += placeCard({ image: a.image, photo: a.photo, title: a.name, badge: a.category, lat: a.lat, lng: a.lng, mapsUrl: a.mapsUrl, q: a.address || a.venue || a.name,
         boxes: `<div class="datebox"><small>換票入場</small><b>${md(parse(a.entryStart))}</b>${window_(a)}</div><div class="datebox"><small>票種</small><b>${esc(a.ticket)}</b>&nbsp;</div>`,
         lines: [['🏟️', a.venue], ['📍', a.address]],
         warn: a.notes.length ? `<div class="warn"><b>❗ 入場須知</b><ul>${a.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>` : '' });
@@ -328,6 +391,7 @@
 
     document.querySelectorAll('[data-nearby]').forEach((b) => b.addEventListener('click', () => {
       const [lat, lng, rec] = b.dataset.nearby.split(',');
+      askedGps = true;
       setCenter({ lat: +lat, lng: +lng }, `以 ${b.dataset.label} 為中心`);
       showRecs = rec === '1';
       switchView('list');
@@ -340,7 +404,7 @@
     // Stays added by hand may have no coordinates yet: navigate by name or address.
     const located = o.lat != null && o.lng != null;
     return `<div class="card">
-      <div class="photo">${o.image ? `<img src="images/${esc(o.image.split('/').pop())}" alt="">` : ''}<h3>${esc(o.title)}</h3>${o.badge ? `<span class="badge">${esc(o.badge)}</span>` : ''}</div>
+      <div class="photo">${o.photo && /^[a-z0-9]+$/.test(o.photo) ? `<img data-photo="${o.photo}" alt="">` : o.image ? `<img src="images/${esc(o.image.split('/').pop())}" alt="">` : ''}<h3>${esc(o.title)}</h3>${o.badge ? `<span class="badge">${esc(o.badge)}</span>` : ''}</div>
       <div class="pad"><div class="dates2">${o.boxes}</div><div style="margin-top:10px">${lines}</div>${o.warn || ''}
       <div class="actions"><a class="btn fill" href="${esc(located ? navUrl(o.lat, o.lng) : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.q || o.title)}`)}" target="_blank" rel="noopener">🧭 導航</a>
         ${located ? `<button class="btn" type="button" data-nearby="${o.lat},${o.lng},0" data-label="${short}">📌 附近收藏</button>
@@ -370,11 +434,15 @@
     $('count-recs').textContent = r.length;
     $('seg-saved').classList.toggle('on', !showRecs);
     $('seg-recs').classList.toggle('on', showRecs);
-    $('center-note').textContent = `${centerLabel}，依距離排序`;
+    $('center-note').textContent = `${centerLabel}，依距離排序${showRecs && recsNote ? `　${recsNote}` : ''}`;
     const items = showRecs ? r : s;
     const ul = $('places');
     if (!items.length) {
-      ul.innerHTML = `<li class="empty" style="display:block">這個範圍內沒有${showRecs ? '推薦地點' : '收藏'}，試試放大距離</li>`;
+      // Far from the trip, its saved places are simply not nearby.
+      const far = !showRecs && center !== tripCenter && saved.length && km(center, tripCenter) > 30;
+      ul.innerHTML = `<li class="empty" style="display:block">${showRecs && recsNote ? esc(recsNote)
+        : far ? '你現在離這趟行程的地點很遠，附近沒有這趟行程的收藏。可以按上面的「以住宿為中心」看行程那邊的收藏。'
+        : `這個範圍內沒有${showRecs ? '推薦地點' : '收藏'}，試試放大距離`}</li>`;
     } else {
       ul.innerHTML = items.slice(0, 300).map(({ p, m }, i) => {
         const c = CATS[p.category] || CATS.other;
@@ -415,19 +483,30 @@
     center = c; centerLabel = label;
     renderList();
     if (map) { renderMap(); map.setView([c.lat, c.lng], 15); }
+    loadRecsAround(c, maxDist);
+  }
+
+  // Centers on where the viewer is. Without permission (or a position) the
+  // list says so and stays on the trip's own place.
+  function useGps(auto) {
+    askedGps = true;
+    const fallback = (why) => {
+      if (auto) { centerLabel = `${why}，目前${tripCenterLabel}`; renderList(); loadRecsAround(center, maxDist); }
+      else $('center-note').textContent = `${why}，請允許瀏覽器使用定位`;
+    };
+    if (!navigator.geolocation) { fallback('這個瀏覽器無法定位'); return; }
+    $('center-note').textContent = '正在取得你的位置…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }, '以你的位置為中心'),
+      () => fallback('無法取得你的位置'),
+      { enableHighAccuracy: true, timeout: 15000 });
   }
 
   $('seg-saved').addEventListener('click', () => { showRecs = false; renderList(); });
   $('seg-recs').addEventListener('click', () => { showRecs = true; renderList(); });
-  $('distance').addEventListener('change', (e) => { maxDist = +e.target.value; renderList(); if (map) renderMap(); });
-  $('use-gps').addEventListener('click', () => {
-    if (!navigator.geolocation) { $('center-note').textContent = '這個瀏覽器無法定位'; return; }
-    $('center-note').textContent = '正在取得位置…';
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }, '以你的位置為中心'),
-      () => { $('center-note').textContent = '無法取得位置，請允許瀏覽器使用定位'; },
-      { enableHighAccuracy: true, timeout: 15000 });
-  });
+  $('distance').addEventListener('change', (e) => { maxDist = +e.target.value; renderList(); if (map) renderMap(); loadRecsAround(center, maxDist); });
+  $('use-gps').addEventListener('click', () => useGps(false));
+  $('use-trip').addEventListener('click', () => { askedGps = true; setCenter(tripCenter, tripCenterLabel); });
 
   // --- 地圖 ---
   function renderMap() {
@@ -452,9 +531,13 @@
     $('page-title').textContent = { trip: '行程', list: '附近的收藏', map: '地圖' }[v];
     if (v === 'list') renderList();
     if (v === 'map') { renderMap(); setTimeout(() => map.invalidateSize(), 50); }
+    // The first look at the list or map centers on the viewer, unless a
+    // "nearby" button on a trip card already chose a center.
+    if ((v === 'list' || v === 'map') && !askedGps) useGps(true);
     window.scrollTo(0, 0);
   }
   document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
 
   load().catch((e) => { $('view-trip').innerHTML = `<p class="empty">找不到這個行程（${esc(e.message)}），請確認連結是否完整。</p>`; });
 })();
+
