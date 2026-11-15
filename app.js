@@ -416,9 +416,15 @@
     }
 
     if (trip.reminders.length) {
-      h += `<div class="card pad reminders"><h3>🔔 注意事項</h3>${trip.reminders.map((r, i) => [r, i]).sort((a, b) => (parse(a[0].date) - parse(b[0].date)) || (a[1] - b[1])).map(([r]) => {
-        const d = parse(r.date);
-        return `<div class="reminder${d < today ? ' past' : ''}"><b>${md(d)}</b><span>${esc(r.text)}</span></div>`;
+      // Whole-trip ones (no date, 全程) first, then by date.
+      const when = (r) => r.date ? parse(r.date) : null;
+      h += `<div class="card pad reminders"><h3>🔔 注意事項</h3>${trip.reminders.map((r, i) => [r, i]).sort((a, b) => {
+        const da = when(a[0]), db = when(b[0]);
+        const c = !da || !db ? (da ? 1 : 0) - (db ? 1 : 0) : da - db;
+        return c || (a[1] - b[1]);
+      }).map(([r]) => {
+        const d = when(r);
+        return `<div class="reminder${d && d < today ? ' past' : ''}"><b>${d ? md(d) : '全程'}</b><span>${esc(r.text)}</span></div>`;
       }).join('')}</div>`;
     }
 
