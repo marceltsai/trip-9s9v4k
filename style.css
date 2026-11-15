@@ -52,7 +52,18 @@ main { max-width: 720px; margin: 0 auto; }
 .ledger-link .ico { font-size: 26px; }
 .ledger-link span:nth-child(2) { flex: 1; }
 .ledger-link b { display: block; font-size: 17px; }
-.ledger-link small { color: var(--muted); }
+.ledger-link small { color: var(--muted); line-height: 1.6; }
+.ledger-link small b { display: inline; font-size: inherit; color: inherit; }
+.ledger-link .owe { color: #c62828; white-space: nowrap; }
+.ledger-link .get { color: #2e7d32; white-space: nowrap; }
+.oh-open { color: var(--primary, #1e88e5); font-weight: 600; }
+.oh-soon { color: #e65100; font-weight: 600; }
+.oh-closed { color: var(--muted); }
+.places .main small.note { color: #bf360c; }
+.note-box { background: rgba(255, 152, 0, .12); border-radius: 10px; padding: 8px 12px; }
+.hours ul { list-style: none; margin: 4px 0; padding: 0 0 0 24px; color: var(--muted); }
+.hours li.today { color: inherit; font-weight: 700; }
+.hours small { color: var(--muted); }
 .ledger-link > span:last-child { font-size: 26px; color: var(--muted); }
 .tabbar button { border: 0; background: none; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; font-size: 13px; cursor: pointer; }
 .tabbar .ico { font-size: 20px; padding: 2px 18px; border-radius: 999px; }

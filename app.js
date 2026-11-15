@@ -32,6 +32,97 @@
   const searchUrl = (q, lat, lng, z = 19) => `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${lat},${lng},${z}z`;
   const utcOffset = (code) => ({ TPE: 8, TSA: 8, KHH: 8, RMQ: 8 }[code] ?? 9);
 
+  // --- Opening hours (same rules as the app's lib/utils/opening_hours.dart) ---
+  const OH_DAYS = { mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6, su: 7 };
+  function ohParse(raw) {
+    const text = (raw || '').trim();
+    if (!text) return null;
+    if (text === '24/7') return { always: true, week: {} };
+    const week = {};
+    for (let rule of text.split(/\s*(?:;|\|\|)\s*/)) {
+      rule = rule.trim();
+      if (!rule) continue;
+      const m = /^([A-Za-z,\- ]*?)\s*(\d.*|off|closed)?$/i.exec(rule);
+      if (!m) return null;
+      const dayPart = (m[1] || '').trim(), timePart = (m[2] || '').trim();
+      let days = [];
+      if (!dayPart) days = [1, 2, 3, 4, 5, 6, 7];
+      else {
+        let onlyHoliday = true;
+        for (const item of dayPart.split(',')) {
+          const t = item.trim().toLowerCase();
+          if (!t) continue;
+          if (t === 'ph' || t === 'sh') continue;
+          onlyHoliday = false;
+          const r = /^(mo|tu|we|th|fr|sa|su)(?:-(mo|tu|we|th|fr|sa|su))?$/.exec(t);
+          if (!r) return null;
+          const a = OH_DAYS[r[1]], b = OH_DAYS[r[2] || r[1]];
+          for (let d = a; ; d = d % 7 + 1) { days.push(d); if (d === b) break; }
+        }
+        if (onlyHoliday) continue;
+      }
+      if (!timePart) { days.forEach((d) => { week[d] = [[0, 1440]]; }); continue; }
+      if (/^(off|closed)$/i.test(timePart)) { days.forEach((d) => { week[d] = []; }); continue; }
+      const spans = [];
+      for (const span of timePart.split(',')) {
+        const t = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/.exec(span.trim());
+        if (!t) return null;
+        const s = +t[1] * 60 + +t[2];
+        let e = +t[3] * 60 + +t[4];
+        if (s > 1440 || e > 2880) return null;
+        if (e <= s) e += 1440;
+        spans.push([s, e]);
+      }
+      days.forEach((d) => { week[d] = spans; });
+    }
+    return Object.keys(week).length ? { always: false, week } : null;
+  }
+  const ohHm = (m) => { m %= 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+  // Saved places are in Taiwan (UTC+8) or Japan/Korea (UTC+9).
+  const localAt = (lng) => { const d = new Date(Date.now() + (lng >= 124.5 ? 9 : 8) * 3600000); return { wd: d.getUTCDay() || 7, now: d.getUTCHours() * 60 + d.getUTCMinutes() }; };
+  /** [open, text, closingSoon] or null. */
+  function ohStatus(h, lng) {
+    if (h.always) return [true, '24 小時營業', false];
+    const { wd, now } = localAt(lng);
+    const yest = (wd + 5) % 7 + 1;
+    const open = (left, end, spanDay) => {
+      if (left < 60) {
+        const day = end >= 1440 ? spanDay % 7 + 1 : spanDay, at = end >= 1440 ? end - 1440 : end;
+        if (!(h.week[day] || []).some((x) => x[0] === at)) return [true, `即將打烊・${ohHm(end)}`, true];
+      }
+      return [true, `營業中・到 ${ohHm(end)}`, false];
+    };
+    for (const [, e] of h.week[yest] || []) if (e > 1440 && now < e - 1440) return open(e - 1440 - now, e, yest);
+    const spans = h.week[wd];
+    if (!spans) return null;
+    for (const [s, e] of spans) if (now >= s && now < e) return open(e - now, e, wd);
+    for (const [s] of spans) if (s > now) return [false, `休息中・${ohHm(s)} 開`, false];
+    for (let k = 1; k <= 7; k++) {
+      const d = (wd + k - 1) % 7 + 1, next = h.week[d];
+      if (next && next.length) {
+        const when = k === 1 ? '明天' : `週${WEEK[d % 7]}`;
+        return [false, `${spans.length ? '休息中' : '今天休息'}・${when} ${ohHm(next[0][0])} 開`, false];
+      }
+    }
+    return [false, '休息中', false];
+  }
+  function ohWeekLines(h) {
+    const out = [];
+    for (let d = 1; d <= 7; d++) {
+      const s = h.always ? [[0, 1440]] : h.week[d];
+      out.push([d, h.always ? '24 小時' : s == null ? '未提供' : !s.length ? '休息' : s.map((x) => `${ohHm(x[0])}–${ohHm(x[1])}`).join('、')]);
+    }
+    return out;
+  }
+  /** The coloured status for a list row, or '' without usable hours. */
+  function statusHtml(p) {
+    const h = ohParse(p.hours);
+    const s = h && ohStatus(h, p.lng);
+    if (!s) return '';
+    const cls = s[2] ? 'oh-soon' : s[0] ? 'oh-open' : 'oh-closed';
+    return `<span class="${cls}">${esc(s[1])}</span> · `;
+  }
+
   // --- OpenStreetMap recommendation parsing (same rules as the app) ---
   const CUISINE = { ramen: '拉麵', sushi: '壽司', udon: '烏龍麵', soba: '蕎麥麵', noodle: '麵食', japanese: '日式料理', chinese: '中式料理', korean: '韓式料理', italian: '義式料理', french: '法式料理', pizza: '披薩', burger: '漢堡', beef_bowl: '牛丼', curry: '咖哩', yakiniku: '燒肉', yakitori: '燒鳥', izakaya: '居酒屋', tempura: '天婦羅', tonkatsu: '豬排', okonomiyaki: '大阪燒', seafood: '海鮮', steak_house: '牛排', coffee_shop: '咖啡廳', cake: '蛋糕', donut: '甜甜圈', ice_cream: '冰品', chicken: '雞肉料理', motsunabe: '牛腸鍋', hot_pot: '火鍋', gyoza: '煎餃' };
   function classify(t) {
@@ -293,6 +384,24 @@
   const window_ = (a) => a.entryEnd ? `${hm(parse(a.entryStart))}–${hm(parse(a.entryEnd))}` : hm(parse(a.entryStart));
   const navTo = (e) => e.lat != null ? navUrl(e.lat, e.lng) : e.q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.q)}` : null;
 
+  // The trip page's 分帳 card shows the totals: what was spent and what each
+  // person still pays or gets back. The app works the figures out.
+  let ledgerSummary = null;
+  async function loadLedgerSummary(id) {
+    const fill = () => { const el = $('ledger-sum'); if (el && ledgerSummary) el.innerHTML = ledgerSummary; };
+    if (ledgerSummary) { setTimeout(fill); return; }
+    try {
+      const res = await fetch(`${DOCS}/ledgers/${id}?key=${API_KEY}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const d = JSON.parse((await res.json()).fields.json.stringValue);
+      const money = (n) => `${d.baseCurrency} ${Math.round(Math.abs(n)).toLocaleString('en-US')}`;
+      const who = (d.settlements || []).filter((s) => Math.abs(s.net) >= 0.5).map((s) =>
+        `<span class="${s.net < 0 ? 'owe' : 'get'}">${esc(s.person)} ${s.net < 0 ? '還要付' : '應收回'} ${money(s.net)}</span>`);
+      ledgerSummary = `總花費 <b>${money(d.totalSpent || 0)}</b>${who.length ? `<br>${who.join('　')}` : '<br>目前大家都結清了'}`;
+      fill();
+    } catch (e) { /* the card still links to the ledger */ }
+  }
+
   function renderTrip() {
     const start = parse(trip.startDate), end = parse(trip.endDate), today = dayOnly(new Date());
     const days = daysBetween(start, end) + 1;
@@ -302,7 +411,8 @@
       <div class="countdown"><b>${big}</b><span>${small}</span></div></div>`;
     if (trip.ledgerId && /^[A-Za-z0-9]{10,64}$/.test(trip.ledgerId)) {
       h += `<a class="card pad ledger-link" href="ledger.html?id=${encodeURIComponent(trip.ledgerId)}">
-        <span class="ico">💰</span><span><b>分帳</b><small>每個人付了多少、還欠多少</small></span><span aria-hidden="true">›</span></a>`;
+        <span class="ico">💰</span><span style="flex:1;min-width:0"><b>分帳</b><small id="ledger-sum">每個人付了多少、還欠多少</small></span><span aria-hidden="true">›</span></a>`;
+      loadLedgerSummary(trip.ledgerId);
     }
 
     if (trip.reminders.length) {
@@ -446,9 +556,9 @@
     } else {
       ul.innerHTML = items.slice(0, 300).map(({ p, m }, i) => {
         const c = CATS[p.category] || CATS.other;
-        const sub = p.rec ? [fmtDist(m), p.kind, p.hours].filter(Boolean).join(' · ') : `${fmtDist(m)} · ${p.lists.join('、')}`;
+        const sub = p.rec ? [fmtDist(m), p.kind].filter(Boolean).join(' · ') : `${fmtDist(m)} · ${p.lists.join('、')}`;
         return `<li data-i="${i}"><div class="ic${p.rec ? ' rec' : ''}" style="${p.rec ? '' : `background:${c.color}`}">${c.icon}</div>
-          <div class="main"><b>${esc(p.name)}</b><small>${esc(sub)}</small></div>
+          <div class="main"><b>${esc(p.name)}</b><small>${statusHtml(p)}${esc(sub)}</small>${p.note ? `<small class="note">📝 ${esc(p.note)}</small>` : ''}</div>
           <span class="acts"><a class="nav" href="${esc(mapUrl(p))}" target="_blank" rel="noopener" aria-label="Google 地圖">🗺️</a><a class="nav" href="${navUrl(p.lat, p.lng)}" target="_blank" rel="noopener" aria-label="導航">🧭</a></span></li>`;
       }).join('');
       ul.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', (ev) => {
@@ -464,13 +574,25 @@
 
   const mapUrl = (p) => p.mapsUrl || searchUrl(p.altName || p.name, p.lat, p.lng);
 
+  /** Opening hours on a place sheet: status, then the week with today bold. */
+  function hoursHtml(p) {
+    if (!p.hours) return '';
+    const h = ohParse(p.hours);
+    if (!h) return `<p>🕒 ${esc(p.hours)}</p>`;
+    const s = ohStatus(h, p.lng), today = localAt(p.lng).wd;
+    return `<div class="hours">🕒 ${s ? `<b class="${s[2] ? 'oh-soon' : s[0] ? 'oh-open' : 'oh-closed'}">${esc(s[1])}</b>` : '營業時間'}
+      <ul>${ohWeekLines(h).map(([d, t]) => `<li${d === today ? ' class="today"' : ''}>週${WEEK[d % 7]}　${esc(t)}</li>`).join('')}</ul>
+      <small>營業時間可能和店家最新公告不同</small></div>`;
+  }
+
   function openSheet(p, m) {
     const c = CATS[p.category] || CATS.other;
     $('sheet-body').innerHTML = `<h3>${c.icon} ${esc(p.name)}</h3>
       ${p.altName ? `<div class="sub">${esc(p.altName)}</div>` : ''}
       <p class="sub">${esc(p.rec ? p.kind : c.label)} · 距離 ${fmtDist(m)}</p>
       ${p.address ? `<p>📍 ${esc(p.address)}</p>` : ''}
-      ${p.hours ? `<p>🕒 ${esc(p.hours)}</p>` : ''}
+      ${p.note ? `<p class="note-box">📝 ${esc(p.note)}</p>` : ''}
+      ${hoursHtml(p)}
       ${p.lists ? `<div class="lists">${p.lists.map((l) => `<span class="tag">${esc(l)}</span>`).join('')}</div>` : '<p class="sub">附近推薦（OpenStreetMap），不是收藏</p>'}
       <div class="actions"><a class="btn fill" href="${navUrl(p.lat, p.lng)}" target="_blank" rel="noopener">🧭 導航</a>
       <a class="btn" href="${esc(mapUrl(p))}" target="_blank" rel="noopener">🗺️ Google 地圖</a></div>`;
