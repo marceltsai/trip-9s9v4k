@@ -407,9 +407,14 @@
     const days = daysBetween(start, end) + 1;
     const [big, small] = today < start ? [daysBetween(today, start), '天後出發'] : today <= end ? ['✈', `旅行第 ${daysBetween(start, today) + 1} 天`] : ['✓', '已結束'];
     const cover = /^[A-Za-z0-9]{4,40}$/.test(trip.cover || '') ? trip.cover : '';
-    let h = `<div class="hero${cover ? ' has-cover' : ''}">${cover ? `<img class="hero-img" alt="" data-photo="${cover}">` : ''}<div style="flex:1;min-width:0"><h2>${esc(trip.title)}</h2>
+    const pos = { top: 'top', bottom: 'bottom' }[trip.coverAlign] || 'center';
+    const info = `<div style="flex:1;min-width:0"><h2>${esc(trip.title)}</h2>
       <div class="dates">${md(start)} – ${md(end)}</div><div class="nights">${days} 天 ${days - 1} 夜</div></div>
-      <div class="countdown"><b>${big}</b><span>${small}</span></div></div>`;
+      <div class="countdown"><b>${big}</b><span>${small}</span></div>`;
+    // With a picture: the picture whole on top, the title in a band below.
+    let h = cover
+      ? `<div class="hero-card"><img class="hero-img" alt="" style="object-position:center ${pos}" data-photo="${cover}"><div class="hero-band">${info}</div></div>`
+      : `<div class="hero">${info}</div>`;
     if (trip.ledgerId && /^[A-Za-z0-9]{10,64}$/.test(trip.ledgerId)) {
       h += `<a class="card pad ledger-link" href="ledger.html?id=${encodeURIComponent(trip.ledgerId)}">
         <span class="ico">💰</span><span style="flex:1;min-width:0"><b>分帳</b><small id="ledger-sum">每個人付了多少、還欠多少</small></span><span aria-hidden="true">›</span></a>`;
