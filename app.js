@@ -406,7 +406,8 @@
     const start = parse(trip.startDate), end = parse(trip.endDate), today = dayOnly(new Date());
     const days = daysBetween(start, end) + 1;
     const [big, small] = today < start ? [daysBetween(today, start), '天後出發'] : today <= end ? ['✈', `旅行第 ${daysBetween(start, today) + 1} 天`] : ['✓', '已結束'];
-    let h = `<div class="hero"><div style="flex:1;min-width:0"><h2>${esc(trip.title)}</h2>
+    const cover = /^[A-Za-z0-9]{4,40}$/.test(trip.cover || '') ? trip.cover : '';
+    let h = `<div class="hero${cover ? ' has-cover' : ''}">${cover ? `<img class="hero-img" alt="" data-photo="${cover}">` : ''}<div style="flex:1;min-width:0"><h2>${esc(trip.title)}</h2>
       <div class="dates">${md(start)} – ${md(end)}</div><div class="nights">${days} 天 ${days - 1} 夜</div></div>
       <div class="countdown"><b>${big}</b><span>${small}</span></div></div>`;
     if (trip.ledgerId && /^[A-Za-z0-9]{10,64}$/.test(trip.ledgerId)) {

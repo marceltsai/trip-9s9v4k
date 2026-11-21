@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>代購明細</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .px-main { max-width: 640px; margin: 0 auto; padding: 12px 16px 40px; }
+  .px-total { display: flex; align-items: center; gap: 12px; padding: 18px; border-radius: 24px;
+    background: linear-gradient(135deg, var(--candy), var(--candy2)); color: var(--on-candy); }
+  .px-total b { font-size: 30px; font-weight: 800; display: block; line-height: 1.2; }
+  .px-total .badge { margin-left: auto; padding: 4px 12px; border-radius: 999px; background: rgb(255 255 255 / 70%); color: var(--fg); font-size: 13px; }
+  .px-item { margin-top: 12px; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+  .px-item h3 { margin: 0; font-size: 17px; }
+  .px-item .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .px-item .price { margin-top: 6px; font-weight: 700; }
+  .px-item .todo { margin-top: 6px; color: var(--muted); }
+  .px-proofs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .px-proofs img { width: 92px; height: 92px; object-fit: cover; border-radius: 12px; background: var(--surface-2); cursor: zoom-in; }
+  .px-zoom { position: fixed; inset: 0; background: rgb(0 0 0 / 85%); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .px-zoom img { max-width: 96vw; max-height: 92vh; }
+  .px-foot { margin-top: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <h1 id="page-title">代購明細</h1>
+  <span class="readonly">唯讀</span>
+</header>
+<main class="px-main">
+  <p class="status" id="status" role="status">讀取中…</p>
+  <div id="content"></div>
+</main>
+<script src="theme.js"></script>
+<script>
+(() => {
+  const API_KEY = 'AIzaSyBKHEGlxuAqRE8zjO3sE9gZOu15lWYKZsk';
+  const DOCS = 'https://firestore.googleapis.com/v1/projects/travel-pocket-61d1b/databases/(default)/documents';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const twd = (n) => `NT$ ${Math.round(n || 0).toLocaleString('en-US')}`;
+  const id = new URLSearchParams(location.search).get('id') || '';
+
+  async function load() {
+    if (!/^[A-Za-z0-9]{10,64}$/.test(id)) { $('status').textContent = '連結不完整，請向對方再要一次'; return; }
+    try {
+      const r = await fetch(`${DOCS}/trips/${id}?key=${API_KEY}`, { cache: 'no-store' });
+      if (r.status === 404) { $('status').textContent = '找不到這份明細，可能已經被刪除'; return; }
+      if (!r.ok) throw new Error(r.status);
+      const d = JSON.parse((await r.json()).fields.json.stringValue);
+      window.applyShareTheme && window.applyShareTheme(d.theme);
+      render(d);
+    } catch (e) {
+      $('status').textContent = '讀取失敗，請稍後重新整理';
+    }
+  }
+
+  function render(d) {
+    document.title = `代購明細 - ${d.requester}`;
+    $('page-title').textContent = `${d.requester} 的代購`;
+    $('status').hidden = true;
+    const items = d.items || [];
+    const bought = items.filter((i) => i.amount != null);
+    let h = `<div class="px-total"><div><small>${esc(d.trip)}・已買 ${bought.length}/${items.length} 件・應付</small><b>${twd(d.total)}</b></div>
+      <span class="badge">${d.paid ? '✅ 已收款' : '未收款'}</span></div>`;
+    for (const i of items) {
+      h += `<div class="px-item"><h3>${esc(i.name)}${i.qty > 1 ? ` ×${i.qty}` : ''}</h3>`;
+      if (i.note) h += `<div class="meta">📝 ${esc(i.note)}</div>`;
+      if (i.amount != null) {
+        h += `<div class="meta">${esc(i.date || '')}${i.where ? `・${esc(i.where)}` : ''}</div>
+          <div class="price">${esc(i.currency)} ${num(i.amount)} ≈ ${twd(i.twd)}${i.fee ? `　＋代購費 ${twd(i.fee)}` : ''}</div>`;
+        const proofs = (i.proofs || []).filter((p) => /^[A-Za-z0-9]{4,40}$/.test(p));
+        if (proofs.length) h += `<div class="px-proofs">${proofs.map((p) => `<img alt="購買證明" data-photo="${p}">`).join('')}</div>`;
+      } else {
+        h += `<div class="todo">還沒買到</div>`;
+      }
+      h += `</div>`;
+    }
+    h += `<p class="px-foot">由「旅途口袋」App 產生${d.updatedAt ? `・更新於 ${new Date(d.updatedAt).toLocaleString('zh-TW')}` : ''}</p>`;
+    $('content').innerHTML = h;
+    document.querySelectorAll('img[data-photo]').forEach(async (el) => {
+      try {
+        const r = await fetch(`${DOCS}/trips/${id}_ph_${el.dataset.photo}?key=${API_KEY}`);
+        if (!r.ok) return;
+        const b64 = (await r.json()).fields.jpeg.stringValue;
+        if (/^[A-Za-z0-9+/=]+$/.test(b64)) el.src = `data:image/jpeg;base64,${b64}`;
+      } catch (e) { /* stays blank */ }
+      el.onclick = () => {
+        if (!el.src) return;
+        const z = document.createElement('div');
+        z.className = 'px-zoom';
+        z.innerHTML = `<img alt="" src="${el.src}">`;
+        z.onclick = () => z.remove();
+        document.body.appendChild(z);
+      };
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

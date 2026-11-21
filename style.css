@@ -83,6 +83,14 @@ main { max-width: 720px; margin: 0 auto; }
 .hero::before { width: 130px; height: 130px; right: -34px; top: -40px; }
 .hero::after { width: 84px; height: 84px; right: 60px; bottom: -36px; background: rgb(255 255 255 / 15%); }
 .hero > * { position: relative; z-index: 1; }
+.hero.has-cover { min-height: 190px; align-items: flex-end; color: #fff; background: #333; }
+.hero.has-cover::before, .hero.has-cover::after { display: none; }
+.hero .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.hero.has-cover > div:not(.countdown) { text-shadow: 0 1px 8px rgb(0 0 0 / 60%); }
+.hero.has-cover::before { display: block; content: ""; inset: 0; width: auto; height: auto; border-radius: 0; z-index: 1;
+  background: linear-gradient(to top, rgb(0 0 0 / 70%), rgb(0 0 0 / 10%) 60%, transparent); }
+.hero.has-cover .countdown { background: rgb(255 255 255 / 85%); color: var(--fg); }
+.hero.has-cover .hero-img + div, .hero.has-cover .countdown { z-index: 2; }
 .hero h2 { margin: 0; font-size: 28px; font-weight: 800; text-wrap: balance; }
 .hero .dates { font-size: 16px; }
 .hero .nights { font-size: 14px; }
