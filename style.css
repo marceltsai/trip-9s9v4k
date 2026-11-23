@@ -47,6 +47,39 @@ main { max-width: 720px; margin: 0 auto; }
   box-shadow: 0 -4px 16px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 .tabbar.four { grid-template-columns: repeat(4, 1fr); }
+.tabbar.five { grid-template-columns: repeat(5, 1fr); }
+/* 我的 tab (mine.js) */
+#view-mine { padding-bottom: 24px; }
+.mine-intro ul { padding-left: 20px; }
+.mine-user { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+.mine-user span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mine-seg { margin-top: 10px; }
+.mine-add { display: flex; gap: 8px; margin-top: 12px; }
+.mine-add input, .mine-form input, .mine-form textarea, .mine-form select { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.mine-form { display: flex; flex-direction: column; gap: 10px; }
+.mine-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+.mine-form .row, .mine-group.row, .mine-item .row { display: flex; gap: 8px; align-items: center; }
+.mine-form .grow, .mine-item .row b { flex: 1; }
+.mine-progress { margin-top: 12px; }
+.mine-progress .bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.mine-progress .bar i { display: block; height: 100%; background: var(--candy); }
+.mine-pack { list-style: none; padding: 0; margin: 8px 0; }
+.mine-pack li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-top: 6px; border-radius: 14px; background: var(--surface); }
+.mine-pack label { flex: 1; display: flex; gap: 10px; align-items: center; }
+.mine-pack input { width: 20px; height: 20px; }
+.mine-pack .done { text-decoration: line-through; color: var(--muted); }
+.mine-group { margin: 18px 0 0; }
+.mine-group h3 { flex: 1; margin: 0; }
+.mine-item.bought b { text-decoration: line-through; color: var(--muted); }
+.mine-price { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 14px; cursor: pointer; }
+.mine-price.best span { color: #2e7d32; font-weight: 700; }
+.mine-paid { margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.mine-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mine-photos img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: var(--surface-2); }
+.mine-actions { display: flex; gap: 8px; margin-top: 10px; }
+.mine-bag { background: var(--surface-2); }
+.btn.danger, .link.danger { color: #c62828; }
+.tabbar.five .ico { padding: 2px 12px; }
 .tabbar a { color: inherit; text-decoration: none; padding: 8px 0 10px; display: flex; flex-direction: column; align-items: center; font-size: 13px; }
 .ledger-link { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
 .ledger-link .ico { font-size: 26px; }

@@ -46,11 +46,17 @@
   const num = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const twd = (n) => `NT$ ${Math.round(n || 0).toLocaleString('en-US')}`;
   const id = new URLSearchParams(location.search).get('id') || '';
+  let photoCol = 'proxyPages';
 
   async function load() {
     if (!/^[A-Za-z0-9]{10,64}$/.test(id)) { $('status').textContent = '連結不完整，請向對方再要一次'; return; }
     try {
-      const r = await fetch(`${DOCS}/trips/${id}?key=${API_KEY}`, { cache: 'no-store' });
+      // Pages made on the web by companions live in proxyPages; the app's in trips.
+      let r = await fetch(`${DOCS}/proxyPages/${id}?key=${API_KEY}`, { cache: 'no-store' });
+      if (r.status === 404 || r.status === 403) {
+        r = await fetch(`${DOCS}/trips/${id}?key=${API_KEY}`, { cache: 'no-store' });
+        photoCol = 'trips';
+      }
       if (r.status === 404) { $('status').textContent = '找不到這份明細，可能已經被刪除'; return; }
       if (!r.ok) throw new Error(r.status);
       const d = JSON.parse((await r.json()).fields.json.stringValue);
@@ -86,7 +92,7 @@
     $('content').innerHTML = h;
     document.querySelectorAll('img[data-photo]').forEach(async (el) => {
       try {
-        const r = await fetch(`${DOCS}/trips/${id}_ph_${el.dataset.photo}?key=${API_KEY}`);
+        const r = await fetch(`${DOCS}/${photoCol}/${id}_ph_${el.dataset.photo}?key=${API_KEY}`);
         if (!r.ok) return;
         const b64 = (await r.json()).fields.jpeg.stringValue;
         if (/^[A-Za-z0-9+/=]+$/.test(b64)) el.src = `data:image/jpeg;base64,${b64}`;

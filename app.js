@@ -225,8 +225,9 @@
       tab.href = `ledger.html?id=${encodeURIComponent(trip.ledgerId)}`;
       tab.innerHTML = '<span class="ico">💰</span>分帳';
       document.querySelector('.tabbar').append(tab);
-      document.querySelector('.tabbar').classList.add('four');
     }
+    const tabs = document.querySelector('.tabbar').children.length;
+    document.querySelector('.tabbar').classList.add(tabs >= 5 ? 'five' : 'four');
     bundledRecs = data.recs;
     recs = cleanRecs(bundledRecs);
     // A trip made on the phone may have no located stop yet.
@@ -236,6 +237,8 @@
     centerLabel = tripCenterLabel;
     $('use-trip').textContent = trip.lodging[0] ? '🏨 以住宿為中心' : '🧳 以行程地點為中心';
     document.title = trip.title;
+    // The "my lists" tab (mine.js) keeps each companion's lists per trip.
+    window.__trip = { id, title: trip.title, baggage: trip.baggage || '', theme: (cloud && cloud.theme) || null };
     renderTrip();
     renderChips();
     renderList();
@@ -660,9 +663,13 @@
   // --- Tabs ---
   function switchView(v) {
     view = v;
-    ['trip', 'list', 'map'].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    ['trip', 'list', 'map', 'mine'].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
     document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
-    $('page-title').textContent = { trip: '行程', list: '附近的收藏', map: '地圖' }[v];
+    $('page-title').textContent = { trip: '行程', list: '附近的收藏', map: '地圖', mine: '我的清單' }[v];
+    if (v === 'mine' && window.renderMine) window.renderMine();
+    // Everything is read-only except the viewer's own lists.
+    const ro = document.querySelector('.topbar .readonly');
+    if (ro) ro.hidden = v === 'mine';
     if (v === 'list') renderList();
     if (v === 'map') { renderMap(); setTimeout(() => map.invalidateSize(), 50); }
     // The first look at the list or map centers on the viewer, unless a

@@ -45,12 +45,15 @@
   <section id="view-map" class="view" hidden>
     <div id="map"></div>
   </section>
+
+  <section id="view-mine" class="view" hidden></section>
 </main>
 
 <nav class="tabbar">
   <button data-view="trip" class="on" type="button"><span class="ico">🧳</span>行程</button>
   <button data-view="list" type="button"><span class="ico">📋</span>清單</button>
   <button data-view="map" type="button"><span class="ico">🗺️</span>地圖</button>
+  <button data-view="mine" type="button"><span class="ico">🎒</span>我的</button>
 </nav>
 
 <div class="sheet-backdrop" id="sheet" hidden>
@@ -61,7 +64,11 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="theme.js"></script>
 <script src="app.js"></script>
+<script src="mine.js"></script>
 </body>
 </html>
