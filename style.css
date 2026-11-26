@@ -71,6 +71,9 @@ main { max-width: 720px; margin: 0 auto; }
 .mine-group { margin: 18px 0 0; }
 .mine-group h3 { flex: 1; margin: 0; }
 .mine-item.bought b { text-decoration: line-through; color: var(--muted); }
+.mine-state { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.mine-state.done { background: var(--candy); color: var(--on-candy); }
+.mine-item summary { cursor: pointer; }
 .mine-price { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 14px; cursor: pointer; }
 .mine-price.best span { color: #2e7d32; font-weight: 700; }
 .mine-paid { margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--surface-2); }

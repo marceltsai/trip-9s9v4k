@@ -191,22 +191,30 @@
   function itemCard(s) {
     const best = s.prices?.length > 1 ? cheapest(s.prices) : -1;
     const p = s.purchase;
+    const prices = (s.prices || []).map((pr, i) => {
+      const v = toTwd(pr.amount, pr.currency);
+      return `<div class="mine-price${i === best ? ' best' : ''}" data-price="${s.id}:${pr.id}">${i === best ? '✅' : '🏷️'} ${esc(pr.where || '某處')}・${esc((pr.date || '').slice(5))}
+        <span>${esc(pr.currency)} ${num(pr.amount)}${v != null && pr.currency !== 'TWD' ? ` ≈${twd(v)}` : ''}${i === best ? ' 最便宜' : ''}</span></div>`;
+    }).join('');
+    // Bought: the compared prices fold away. Not yet: they are labelled so
+    // nobody mistakes them for a purchase.
+    const pricesHtml = !prices ? '' : p
+      ? `<details><summary class="sub">當時比過 ${s.prices.length} 個價格（點開看）</summary>${prices}</details>`
+      : `<div class="sub">看過的價格（比價用，還沒買）</div>${prices}`;
     return `<div class="card pad mine-item${p && !s.requester ? ' bought' : ''}">
       <div class="row"><b>${esc(s.name)}${s.qty > 1 ? ` ×${s.qty}` : ''}</b>
+        <span class="mine-state${p ? ' done' : ''}">${p ? '✅ 已買到' : '還沒買'}</span>
         <button class="link" data-edit="${s.id}" type="button">修改</button></div>
+      ${s.photo ? `<div class="mine-photos"><img data-mine-photo="${esc(s.photo)}" alt="商品照片"></div>` : ''}
       ${s.where ? `<div class="sub">🏪 ${esc(s.where)}</div>` : ''}
       ${s.note ? `<div class="sub">📝 ${esc(s.note)}</div>` : ''}
       ${p && p.amount ? `<div class="mine-paid"><b>已買：${esc(p.currency)} ${num(p.amount)} ≈ ${twd(p.twd)}${p.fee ? ` ＋代購費 ${twd(p.fee)}` : ''}</b>
         <div class="sub">${esc(p.date)}${p.where ? `・${esc(p.where)}` : ''}・${MODES[p.rateMode] || ''}</div>
         ${(p.proofs || []).length ? `<div class="mine-photos">${p.proofs.map((n) => `<img data-mine-photo="${esc(n)}" alt="購買證明">`).join('')}</div>` : ''}</div>` : (p ? '<div class="sub">✅ 已買到</div>' : '')}
-      ${(s.prices || []).map((pr, i) => {
-        const v = toTwd(pr.amount, pr.currency);
-        return `<div class="mine-price${i === best ? ' best' : ''}" data-price="${s.id}:${pr.id}">${i === best ? '✅' : '🏷️'} ${esc(pr.where || '某處')}・${esc((pr.date || '').slice(5))}
-          <span>${esc(pr.currency)} ${num(pr.amount)}${v != null && pr.currency !== 'TWD' ? ` ≈${twd(v)}` : ''}${i === best ? ' 最便宜' : ''}</span></div>`;
-      }).join('')}
+      ${pricesHtml}
       <div class="mine-actions">
-        ${p ? `<button class="btn" data-unbuy="${s.id}" type="button">改回還沒買</button>` : `<button class="btn" data-price-add="${s.id}" type="button">🏷️ 記價格</button>
-        <button class="btn fill" data-buy="${s.id}" type="button">🛒 買到了</button>`}
+        ${p ? `<button class="btn" data-unbuy="${s.id}" type="button">改回還沒買</button>` : `<button class="btn" data-price-add="${s.id}" type="button">🏷️ 記看到的價格</button>
+        <button class="btn fill" data-buy="${s.id}" type="button">🛒 我買了</button>`}
       </div></div>`;
   }
 
@@ -218,8 +226,8 @@
     if (!lists.shop.length) {
       h += `<div class="card pad"><h3>怎麼用</h3>
         <p><b>1. 先列出想買的</b><br>按「新增」。幫別人買的話，在「幫誰買」填上名字。</p>
-        <p><b>2. 看到價格就記下來</b><br>在商品下按「記價格」。記了兩家以上，最便宜的會標出來。</p>
-        <p><b>3. 買到了按「買到了」</b><br>幫別人買的會要你填實付金額和購買證明，之後可以一鍵把明細傳給對方。</p></div>`;
+        <p><b>2. 看到價格就記下來</b><br>在商品下按「記看到的價格」（還沒買，只是比價）。記了兩家以上，最便宜的會標出來。</p>
+        <p><b>3. 買了就按「我買了」</b><br>幫別人買的會要你填實付金額和購買證明，之後可以一鍵把明細傳給對方。</p></div>`;
     }
     if (mine.length) {
       h += `<h3 class="mine-group">🙋 自己要買</h3>`;
@@ -268,8 +276,11 @@
 
   function itemSheet(old) {
     const known = [...new Set(lists.shop.map((s) => s.requester).filter(Boolean))];
+    let photo = old?.photo;
     sheet(`<h3>${old ? '修改商品' : '新增要買的東西'}</h3>
       <form class="mine-form" id="f">
+        <label>📷 商品照片（選填）<input type="file" accept="image/*" id="item-photo"></label>
+        <div class="mine-photos" id="item-photo-view">${photo ? `<img data-mine-photo="${esc(photo)}" alt="">` : ''}</div>
         <label>商品名稱<input name="name" required value="${esc(old?.name)}"></label>
         <label>數量<input name="qty" type="number" min="1" value="${old?.qty || 1}"></label>
         <label>幫誰買（留空＝自己要買）<input name="req" list="reqs" value="${esc(old?.requester)}"></label>
@@ -279,10 +290,23 @@
         <div class="row"><button class="btn fill" type="submit">儲存</button>
         ${old ? '<button class="btn danger" type="button" id="del">刪除</button>' : ''}</div>
       </form>`, (el) => {
+      fillPhotos(el);
+      el.querySelector('#item-photo').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const btn = el.querySelector('#f button[type=submit]');
+        btn.disabled = true; btn.textContent = '照片上傳中…';
+        try {
+          photo = await savePhoto(file);
+          el.querySelector('#item-photo-view').innerHTML = `<img src="${photoCache[photo]}" alt="">`;
+        } catch (err) { alert(`照片上傳失敗：${err.message}`); }
+        btn.disabled = false; btn.textContent = '儲存';
+      };
       el.querySelector('#f').onsubmit = (e) => {
         e.preventDefault();
         const f = new FormData(e.target);
         const s = old || { id: newId(), prices: [] };
+        s.photo = photo;
         s.name = f.get('name').trim(); s.qty = Math.max(1, parseInt(f.get('qty'), 10) || 1);
         s.requester = f.get('req').trim() || undefined; s.where = f.get('where').trim(); s.note = f.get('note').trim();
         if (!s.name) return;
@@ -295,7 +319,7 @@
   }
 
   function priceSheet(item, old) {
-    sheet(`<h3>${old ? '修改價格' : '記下價格'}：${esc(item.name)}</h3>
+    sheet(`<h3>${old ? '修改價格' : '記看到的價格（還沒買）'}：${esc(item.name)}</h3>
       <form class="mine-form" id="f">
         <div class="row"><select name="cur">${curOptions(old?.currency || lists.rates.currency)}</select>
         <label class="grow">價格<input name="amount" inputmode="decimal" required value="${old ? old.amount : ''}"></label></div>
@@ -325,8 +349,9 @@
     const bp = best >= 0 ? item.prices[best] : null;
     let mode = lists.rates.mode;
     const proofs = [];
-    sheet(`<h3>買到「${esc(item.name)}」</h3>
+    sheet(`<h3>我買了「${esc(item.name)}」</h3>
       <form class="mine-form" id="f">
+        ${(item.prices || []).length ? `<div class="sub">你買的是哪一個？點一下帶入</div><div class="chips">${item.prices.map((p, i) => `<button type="button" class="chip" data-pick="${i}">${esc(p.where || '某處')} ${esc(p.currency)} ${num(p.amount)}</button>`).join('')}</div>` : ''}
         <div class="row"><select name="cur">${curOptions(bp?.currency || lists.rates.currency)}</select>
         <label class="grow">實付金額${item.qty > 1 ? `（${item.qty} 件合計）` : ''}${proxy ? '' : '（選填）'}<input name="amount" inputmode="decimal" value="${bp ? bp.amount * item.qty : ''}"></label></div>
         <div class="chips" id="modes">${Object.entries(MODES).map(([k, v]) => `<button type="button" class="chip${k === mode ? ' on' : ''}" data-mode="${k}">${v}</button>`).join('')}</div>
@@ -357,6 +382,15 @@
         update();
       };
       el.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => { mode = b.dataset.mode; el.querySelectorAll('[data-mode]').forEach((x) => x.classList.toggle('on', x === b)); loadRate(); }; });
+      el.querySelectorAll('[data-pick]').forEach((b) => {
+        b.onclick = () => {
+          const p = item.prices[+b.dataset.pick];
+          if (![...f.cur.options].some((o) => o.value === p.currency)) f.cur.add(new Option(p.currency));
+          f.cur.value = p.currency; f.amount.value = p.amount * (item.qty || 1); f.where.value = p.where || '';
+          el.querySelectorAll('[data-pick]').forEach((x) => x.classList.toggle('on', x === b));
+          loadRate();
+        };
+      });
       f.cur.onchange = loadRate; f.amount.oninput = update; if (f.twd) f.twd.oninput = update; if (f.fee) f.fee.oninput = update;
       el.querySelector('#proof').onchange = async (e) => {
         const btn = el.querySelector('#save'); btn.disabled = true; btn.textContent = '照片上傳中…';
